@@ -1,0 +1,174 @@
+version: "3.9"
+
+networks:
+  streamflow-net:
+   driver: bridge
+  
+volumes:
+  postgres-data:
+  minio-data:
+  redis-data:
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: streamflow-postgres
+    networks: [streamflow-net]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      intervals: 10s
+      timeout: 5s
+      retries: 5
+  
+
+  redis:
+    image: redis:7-alpine
+    container-name: streamflow-redis
+    networks: [streamflow-net]
+    volumes:
+      redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli","ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+  minio:
+    image: minio/minio:latest
+    container-name: streamflow-minio
+    networks: [streamflow-net]
+    volumes:
+      - minio-data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+
+    command: server /data --console-address ":9001"
+    ports:
+     - "9000:9000"
+     - "9001:9001"
+    healthcheck:
+      tests: ["CMD","curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    contianer_name: streamflow-zookeeper
+    networks: [streamflow-zookeeper]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2101
+      ZOOKEEPER_TICK_TIME: 2000
+
+
+  kafka:
+    image: confluentic/cp-kafka:7.5.0
+    container_name: streamflow-kafka
+    networks: [streamflow-net]
+    depends_on: [zookeeper]
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR:1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      tests: ["CMD", "kafka-broker-api-versions","--bootstrap-server","localhost:9092"]
+      intervals: 30s
+      timeout: 10s
+      retries: 5
+  
+  kafka-ui:
+    image: provectuslab/kafka-ui:latest
+    container_name: streamflow-kafka-ui
+    networks: [streamflow-net]
+    depends_on: [kafka]
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: streamflow
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    contiainer_name: streamflow-api
+    networks: [streamflow-net]    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_URL: ${REDIS_URL}
+    volumes:
+      - ./api:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  processor:
+    build:
+      context: ./processor
+      dockerfile: Dockerfile
+    container_name: streamflow-processor
+    networks: [streamflow-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      environment:
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        POSTGRES_DB: ${POSTGRES_DB}
+        POSTGRES_HOST: ${POSTGRES_HOST}
+        POSTGRES_PORT: ${POSTGRES_PORT}
+        MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+        MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+        MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+        MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+        KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      volumes:
+        - ./processor:/app
+        - /tmp/streamflow-processing:/tmp:processing
+      command: python worker.py
+    
+    deploy:
+      resource:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+      
