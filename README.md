@@ -1,3 +1,15 @@
+ Home Page | Video Player |
+|-----------|-------------|
+| ![Home Page](docs/screenshots/homepage.png) | ![Video Player](docs/screenshots/player.png) |
+ 
+| Upload Page | Kafka UI (Job Queue) |
+|-------------|---------------------|
+| ![Upload](docs/screenshots/upload.png) | ![Kafka](docs/screenshots/kafka-ui.png) |
+ 
+| MinIO Console (Stored HLS Segments) |
+|-------------------------------------|
+| ![MinIO](docs/screenshots/minio-console.png) |
+
 ## 🚀 What is StreamFlow?
  
 StreamFlow is a **full-stack video streaming platform** that replicates the core infrastructure of platforms like YouTube and Netflix. Users upload videos which are automatically transcoded into multiple quality levels and delivered to the browser using **adaptive bitrate streaming** — the player automatically switches between 360p, 720p, and 1080p based on the viewer's network speed, in real time.
