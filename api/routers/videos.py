@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRoute, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
@@ -15,12 +15,12 @@ async def list_videos(db:AsyncSession = Depends(get_db)):
     result = await db.execute(
         text("SELECT * FROM videos ORDER BY created_at DESC LIMIT 50")
     )
-    videos=result.mappings().all
+    videos=result.mappings().all()
     return [dict(v) for v in videos]
 
 
 @router.get("/{video_id}")
-async def get_video(video_id: str db: AsyncSession= Depend(get_db)):
+async def get_video(video_id: str, db: AsyncSession= Depends(get_db)):
     result = await db.execute(
         text("SELECT * FROM videos WHERE id = :id"),
         {
@@ -28,7 +28,7 @@ async def get_video(video_id: str db: AsyncSession= Depend(get_db)):
         }
     )
 
-
+    video = result.mappings().first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
@@ -45,4 +45,3 @@ async def get_video(video_id: str db: AsyncSession= Depend(get_db)):
 
     return video_dict
 
-    

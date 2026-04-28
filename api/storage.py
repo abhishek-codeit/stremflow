@@ -1,13 +1,13 @@
 import os
-from minio impot Minio
+from minio import Minio
 from minio.error import S3Error
 import io
 
 
-endpoint = os.getenv("MINIO_ENDPOINT", "https://minio:9000").replace("http://").replace("https://","")
+endpoint = os.getenv("MINIO_ENDPOINT", "https://minio:9000").replace("http://","").replace("https://","")
 is_secure = os.getenv("MINIO_ENDPOINT","").startswith("https://")
 
-minio.client = Minio(
+minio_client = Minio(
     endpoint = endpoint,
     access_key=os.getenv("MINIO_ROOT_USER","minioadmin"),
     secret_key=os.getenv("MINIO_ROOT_PASSWORD","minioadmin"),
@@ -21,7 +21,7 @@ def init_buckets():
     for bucket in [RAW_BUCKET, PROCESSED_BUCKET]:
         if not minio_client.bucket_exists(bucket):
             minio_client.make_bucket(bucket)
-            pirnt(f"Created bucket: {bucket}")
+            print(f"Created bucket: {bucket}")
         else:
             print(f"bucket exists: {bucket}")
         
@@ -39,13 +39,13 @@ def init_buckets():
     print("Set videos-processsed bucket to public")
 
 
-def upload_file(bucket: str, object_name: str, data: bytes, content_type: str);
-    minio.client.put_object(
+def upload_file(bucket: str, object_name: str, data: bytes, content_type: str):
+    minio_client.put_object(
         bucket_name=bucket,
         object_name=object_name,
         data=io.BytesIO(data),
         length=len(data),
-        content_type:content_type
+        content_type=content_type
     )
     public_url=os.getenv("MINIO_PUBLIC_URL","http://localhost:9000")
     return f"{public_url}/{bucket}/{object_name}"

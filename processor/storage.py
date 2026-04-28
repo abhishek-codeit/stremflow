@@ -1,5 +1,5 @@
 import os
-fromm minio import Minio
+from minio import Minio
 import io
 
 endpoint = os.getenv("MINIO_ENDPOINT","http://minio:9000").replace("http://","").replace("https://","")
@@ -30,4 +30,4 @@ def upload_file_from_disk(bucket: str, object_name: str, file_path: str, content
         file_path=file_path,
         content_type=content_type,
     )
-    print(f"Uploaded file {bucket_name}/{object_name} {file_path}")
+    print(f"Uploaded file {bucket}/{object_name} {file_path}")

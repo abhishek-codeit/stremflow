@@ -10,7 +10,7 @@ DATABASE_URL = (
     f"/{os.getenv('POSTGRES_DB')}"
 )
 
-engine = crete_async_engine(DATABASE_URL,echo=False)
+engine = create_async_engine(DATABASE_URL,echo=False)
 
 SessionLocal = async_sessionmaker(engine,expire_on_commit=False)
 
